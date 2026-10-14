@@ -1,0 +1,75 @@
+# Ambiente local. Senhas e chaves abaixo são de desenvolvimento; em produção vêm do gestor de segredos.
+#
+#   docker compose up -d db api                                 # banco + API em http://localhost:8000
+#   docker compose run --rm tools agrocredit.infrastructure.db.migrate
+#   docker compose run --rm tools agrocredit.pipeline run ibama
+#   docker compose run --rm tools agrocredit.manutencao fontes
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: agrocredit_db
+      POSTGRES_USER: agrocredit_owner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_only_owner}
+      # Senhas dos usuários de login de cada papel (apenas desenvolvimento local)
+      API_DB_PASSWORD: ${API_DB_PASSWORD:-dev_only_api}
+      ETL_DB_PASSWORD: ${ETL_DB_PASSWORD:-dev_only_etl}
+      MAINT_DB_PASSWORD: ${MAINT_DB_PASSWORD:-dev_only_maint}
+    ports:
+      # 5432 já é usada por outro projeto nesta máquina
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agrocredit_owner -d agrocredit_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      target: api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      AGROCREDIT_DATABASE_URL: postgresql://agrocredit_api:${API_DB_PASSWORD:-dev_only_api}@db:5432/agrocredit_db
+      AGROCREDIT_HMAC_PEPPER: ${AGROCREDIT_HMAC_PEPPER:-dev_only_pepper_nao_usar_em_producao_0123456789}
+      AGROCREDIT_JWT_JWKS_ARQUIVO: /run/secrets/jwks.json
+      AGROCREDIT_JWT_ISSUER: ${AGROCREDIT_JWT_ISSUER:-https://auth.agrocredit.local}
+      AGROCREDIT_JWT_AUDIENCE: ${AGROCREDIT_JWT_AUDIENCE:-agrocredit-api}
+      AGROCREDIT_METRICS_TOKEN: ${AGROCREDIT_METRICS_TOKEN:-}
+    volumes:
+      - ./.secrets/jwks.json:/run/secrets/jwks.json:ro  # gerado por `make chaves-dev`
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/readiness', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  tools:
+    profiles: ["tools"]
+    # Escreve em ./data e ./archive: em desenvolvimento, roda com o uid do host (make passa HOST_UID)
+    user: "${HOST_UID:-10001}:${HOST_GID:-10001}"
+    build:
+      context: .
+      target: tools
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MIGRATIONS_DATABASE_URL: postgresql://agrocredit_owner:${POSTGRES_PASSWORD:-dev_only_owner}@db:5432/agrocredit_db
+      ETL_DATABASE_URL: postgresql://agrocredit_etl:${ETL_DB_PASSWORD:-dev_only_etl}@db:5432/agrocredit_db
+      MAINT_DATABASE_URL: postgresql://agrocredit_maint:${MAINT_DB_PASSWORD:-dev_only_maint}@db:5432/agrocredit_db
+      AGROCREDIT_HMAC_PEPPER: ${AGROCREDIT_HMAC_PEPPER:-dev_only_pepper_nao_usar_em_producao_0123456789}
+    volumes:
+      - ./data:/app/data          # Bronze
+      - ./archive:/app/archive    # Parquet de auditoria expurgada e versões arquivadas (levar ao frio)
+
+volumes:
+  pgdata:

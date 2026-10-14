@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: agrocredit_db
+          POSTGRES_USER: agrocredit_owner
+          POSTGRES_PASSWORD: ci_only
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U agrocredit_owner -d agrocredit_db"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://agrocredit_owner:ci_only@localhost:5433/agrocredit_db
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --all-extras
+      - name: Papéis e usuários do banco (mesmo script do initdb local)
+        env:
+          PGPASSWORD: ci_only
+          POSTGRES_USER: agrocredit_owner
+          POSTGRES_DB: agrocredit_db
+          API_DB_PASSWORD: dev_only_api
+          ETL_DB_PASSWORD: dev_only_etl
+          MAINT_DB_PASSWORD: dev_only_maint
+          PGHOST: localhost
+          PGPORT: "5433"
+        run: sh docker/initdb/01-roles.sh
+      - name: Lint
+        run: |
+          uv run ruff format --check src tests
+          uv run ruff check src tests
+      - name: Tipagem
+        run: uv run mypy
+      - name: SAST
+        run: uv run bandit -q -r src -ll
+      - name: Dependências
+        run: uv run pip-audit
+      - name: Segredos
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Testes (domínio, segurança e integração com PostGIS)
+        run: uv run pytest

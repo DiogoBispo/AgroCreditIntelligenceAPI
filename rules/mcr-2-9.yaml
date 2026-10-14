@@ -1,0 +1,63 @@
+# Ruleset do MCR 2-9 (impedimentos sociais, ambientais e climáticos do crédito rural).
+#
+# ATENÇÃO: rascunho técnico. `revisao_juridica: PENDENTE` significa que a obrigatoriedade das regras e
+# os parâmetros (fases de TI, categorias de UC, tipos de floresta pública, data de corte do PRODES)
+# ainda NÃO foram validados por jurídico contra a redação vigente da norma. Não usar em produção assim.
+#
+# obrigatoria: true  -> NAO_VERIFICADO nesta regra torna o parecer INCONCLUSIVO.
+# obrigatoria: false -> NAO_VERIFICADO é informado no parecer, mas não muda o status final.
+
+versoes:
+  - id: "MCR-2-9@2026-05-12"
+    vigencia_inicio: 2026-05-12
+    vigencia_fim: null
+    revisao_juridica: PENDENTE
+    regras:
+      R-CAR:
+        obrigatoria: true
+      R-MTE:
+        obrigatoria: true
+      R-EMB-GEO:
+        obrigatoria: true
+      R-EMB-EST:
+        # Fase 0: só MG publica base aberta; GO não tem e PR não foi confirmada.
+        obrigatoria: false
+        # UFs cuja fonte não informa se o embargo segue vigente: no máximo ALERTA, nunca IMPEDIDO.
+        ufs_sem_situacao: [MG]
+      R-EMB-DOC:
+        obrigatoria: false
+        # Fase 0: IBAMA publica CPF e CNPJ sem máscara. Obrigatoriedade depende do jurídico
+        # (embargo de atividade, sem área, impede o crédito?). Ver documents/FASE0_FONTES.md §10.
+        tipos_documento_verificaveis: [CPF, CNPJ]
+        # Embargos destes órgãos não trazem situação (vigente × levantado): no máximo ALERTA
+        orgaos_sem_situacao: [SEMAD-MG]
+      R-EMB-SEMGEO:
+        obrigatoria: false
+      R-TI:
+        # BLOQUEIO (Fase 0): sem fonte atual de TI acessível; obrigatória faz todo parecer sair
+        # INCONCLUSIVO até a decisão de FASE0_FONTES.md §8.
+        obrigatoria: true
+        # Fases na fonte, normalizadas pela carga: EM_ESTUDO, DELIMITADA, DECLARADA, HOMOLOGADA,
+        # ENCAMINHADA_RI, REGULARIZADA.
+        fases_impeditivas: [DECLARADA, HOMOLOGADA, ENCAMINHADA_RI, REGULARIZADA]
+      R-UC:
+        obrigatoria: true
+        # Códigos normalizados a partir da categoria do CNUC (pipeline/fontes/territoriais.py):
+        # APA, ARIE, ESEC, FLORESTA, MONA, PARQUE, RVS, REBIO, RDS, REFAU, RESEX, RPPN.
+        # Demais categorias intersectadas geram ALERTA.
+        categorias_impeditivas: [ESEC, REBIO, PARQUE, MONA, RVS]
+      R-QUI:
+        obrigatoria: true
+        # Fases na fonte (INCRA): RTID, PORTARIA, DECRETO, TITULO_PARCIAL, TITULADO, CCDRU, TITULO_ANULADO.
+        # O MCR fala em território titulado; demais fases geram ALERTA.
+        fases_impeditivas: [TITULADO, TITULO_PARCIAL]
+      R-FPND:
+        obrigatoria: true
+        tipos_impeditivos: [B]
+      R-PRODES:
+        obrigatoria: false
+        # Comparada com a data da imagem (image_date → data_deteccao na carga), não com o ano PRODES.
+        data_corte: 2019-07-31
+      R-RFB:
+        # Não há fonte para CPF: obrigatória faria todo produtor PF sair INCONCLUSIVO.
+        obrigatoria: false

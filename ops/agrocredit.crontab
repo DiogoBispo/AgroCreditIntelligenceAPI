@@ -1,0 +1,30 @@
+# Agendamento do AgroCredit (instale com: crontab ops/agrocredit.crontab, ajustando o caminho).
+# Cadência alinhada à publicação de cada fonte (DATA_PIPELINE §4). Horários em BRT.
+# Em Kubernetes, cada linha vira um CronJob com a imagem `tools` e o mesmo comando.
+SHELL=/bin/sh
+# Caminho do clone do repositório
+AGROCREDIT=/opt/agrocredit
+# AGROCREDIT_ALERTA_CMD=...   comando que recebe a mensagem de falha pela entrada padrão
+
+# Bases ------------------------------------------------------------------------------------
+# IBAMA publica diariamente (~04:00)
+30 5 * * *   $AGROCREDIT/ops/agendar.sh ibama        agrocredit.pipeline run ibama
+# MTE publica sem data fixa: checagem diária; PDF idêntico ao da versão em uso não gera versão nova
+0 6 * * *    $AGROCREDIT/ops/agendar.sh mte          agrocredit.pipeline run mte
+# SICAR: semanal (domingo); as camadas territoriais usam os envelopes dos imóveis
+0 2 * * 0    $AGROCREDIT/ops/agendar.sh sicar        agrocredit.pipeline run sicar
+0 4 * * 0    $AGROCREDIT/ops/agendar.sh embargos_mg  agrocredit.pipeline run embargos_mg
+30 4 * * 0   $AGROCREDIT/ops/agendar.sh quilombolas  agrocredit.pipeline run quilombolas
+# Fontes de publicação semestral/anual: mensal basta
+0 3 1 * *    $AGROCREDIT/ops/agendar.sh cnuc         agrocredit.pipeline run cnuc
+30 3 1 * *   $AGROCREDIT/ops/agendar.sh cnfp         agrocredit.pipeline run cnfp
+0 4 1 * *    $AGROCREDIT/ops/agendar.sh prodes       agrocredit.pipeline run prodes
+
+# Manutenção (RUNBOOK §4) ---------------------------------------------------------------------
+# Defasagem das bases: saída 1 (P2) ou 2 (P1) dispara o alerta
+0 * * * *    $AGROCREDIT/ops/agendar.sh fontes       agrocredit.manutencao fontes
+# Partições da auditoria sempre 3 meses à frente
+0 1 1 * *    $AGROCREDIT/ops/agendar.sh particoes    agrocredit.manutencao particoes --meses 3
+# Expurgo da auditoria (> 5 anos) e arquivamento de versões antigas: levar /app/archive ao frio
+0 2 2 * *    $AGROCREDIT/ops/agendar.sh expurgo      agrocredit.manutencao expurgar-auditoria --destino /app/archive/auditoria
+0 3 * * 1    $AGROCREDIT/ops/agendar.sh versoes      agrocredit.manutencao limpar-versoes --manter 2 --destino /app/archive/versoes

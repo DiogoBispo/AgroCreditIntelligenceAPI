@@ -1,0 +1,38 @@
+# Python / ferramentas
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Segredos e configuração local (nunca versionar)
+.env
+.env.*
+!.env.example
+.secrets/
+*.pem
+*.key
+
+# Dados do pipeline (Bronze) e arquivos de saída: grandes e regeneráveis
+data/
+# Parquet de auditoria expurgada e versões arquivadas (vão para o armazenamento frio, não para o git)
+archive/
+*.log
+
+# Backups locais (ex.: documentsV01.tar.gz, versão 1.0 dos documentos; mudanças registradas nas notas
+# de revisão de cada documento)
+*.tar.gz
+*.zip
+
+# Editores e sistema operacional
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
