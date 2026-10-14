@@ -8,6 +8,11 @@
 - **Stack:** Python 3.12+, DuckDB, Polars, Shapely 2.x, GeoPandas, PostgreSQL 16 / PostGIS 3.4
 - **Escopo MVP:** Rio Verde (GO), Patrocínio (MG), Castro (PR)
 
+> **Terras indígenas e RFB (14/10/2026)**:
+> - **TI**: `pipeline/fontes/territoriais.py` (`run ti`), cópia da Funai sincronizada pelo IBAMA (PAMGIA), ArcGIS REST por envelope. Data de referência = `dt_sync` da camada inteira. O download falha se o ArcGIS responder erro ou se a camada inteira vier vazia; um envelope sem TI é publicado vazio (`permite_vazia`), porque é resultado legítimo.
+> - **RFB**: `pipeline/fontes/rfb.py` (`run rfb`), todos os estabelecimentos via WebDAV público da RFB, só 4 colunas (CNPJ, situação, CNAE, município), todas as situações. Transformação em DuckDB a partir de streaming latin-1 → UTF-8; carga por `COPY` de CSV com PK e índices criados depois da cópia.
+> - Validação cruzada após cada carga: `python -m agrocredit.manutencao validar-espacial`.
+>
 > **Camadas territoriais e embargos de MG (14/10/2026)** — `pipeline/fontes/territoriais.py` e `embargos_mg.py`. Canais e achados em `FASE0_FONTES.md` §9b. Destaques:
 > - Limites de defasagem ajustados à cadência real de publicação (CNUC 240 dias, CNFP 395 dias); antes, 60 dias faria toda base semestral ou anual nascer "desatualizada".
 > - Referência da guarda de reparo é validada por fonte antes do uso: confiável no SICAR e no IBAMA; **descartada no PRODES** (`area_km` em outra projeção).
@@ -188,8 +193,9 @@ Simplificação (se necessária para mapas) é feita em tabela separada, nunca u
 | Embargos estaduais | Semanal ou conforme publicação | 7 dias | 14 dias |
 | SICAR | Quinzenal | 15 dias | 30 dias |
 | RFB CNPJ | Mensal | 35 dias | 45 dias |
-| FUNAI, INCRA | Mensal | 35 dias | 60 dias |
-| CNUC (UCs, MMA) | Semestral (conforme publicação) | — | 240 dias |
+| FUNAI (cópia sincronizada no PAMGIA) | Semanal | 90 dias | 180 dias |
+| INCRA | Semanal | 35 dias | 60 dias |
+| CNUC (UCs, MMA) | Mensal (publicação semestral, versão aberta com atraso) | 240 dias | 450 dias |
 | CNFP (SFB) | Anual | — | 395 dias |
 | PRODES | Conforme publicação anual | — | 13 meses |
 | IBGE | Anual | — | — |

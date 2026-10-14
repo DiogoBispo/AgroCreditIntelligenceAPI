@@ -7,6 +7,8 @@
 - **Status:** Em revisão (substitui v1.1.0)
 - **Data:** Outubro de 2026
 
+> **Revisão normativa (14/10/2026)** — regras reescritas a partir do texto oficial do MCR 2-9 (atualização 756). Principais efeitos: embargo estadual e embargo por documento do tomador passam a informativos (o item 10 exige embargo de área registrado na lista do IBAMA); terra indígena só impede se homologada, regularizada ou Reserva Indígena (item 7); UC segue o domínio, não a categoria (itens 5 e 6); PRODES informa a data de início da exigência por porte (item 17); CAR coletivo tratado pelo item 13. Cada resultado traz o campo `basis` com o item. Fonte de terras indígenas: cópia da Funai sincronizada pelo IBAMA (PAMGIA). RFB carregada por completo.
+>
 > **Atualização pós-Fase 0 (13/10/2026)** — ver `FASE0_FONTES.md`
 > - Códigos TOM corrigidos com a tabela oficial da RFB (9571, 4961, 7495).
 > - R-EMB-SEMGEO: só embargo sem polígono com ponto dentro do imóvel (antes: qualquer um no município).
@@ -173,23 +175,22 @@ Detalhes de pipeline: DATA_PIPELINE.md. Schema físico e contratos: SPEC-001.md.
 
 ### 5.2 Regras
 
-| ID | Regra | Resultado | Obrigatória* |
-| :-- | :-- | :-- | :-- |
-| R-CAR | CAR não encontrado, `CANCELADO` ou `SUSPENSO` | `IMPEDIDO` | Sim |
-| R-CAR (pendente) | CAR `PENDENTE` | `OK` com registro do status (o MCR não veda CAR pendente) | — |
-| R-MTE | Documento, ou raiz do CNPJ, no cadastro de empregadores do MTE | `IMPEDIDO` | Sim |
-| R-EMB-GEO | Interseção do CAR com embargo **federal (IBAMA e ICMBio)** vigente acima da tolerância; abaixo → `ALERTA` | `IMPEDIDO` | Sim |
-| R-EMB-EST | Interseção com embargo **estadual** vigente, mesma lógica; base ausente → `NAO_VERIFICADO`; fonte sem situação do embargo (MG) → no máximo `ALERTA` | `IMPEDIDO` | Não |
-| R-EMB-DOC | CPF ou CNPJ do tomador (ou outra filial da mesma empresa) como autuado em embargo vigente; se todos os achados vêm de fonte sem situação (MG), no máximo `ALERTA` | `IMPEDIDO` | Não (pendente jurídico: embargo de atividade) |
-| R-EMB-SEMGEO | Embargo vigente sem polígono cujo ponto de referência cai dentro do imóvel | `ALERTA` | Não |
-| R-TI | Interseção com terra indígena nas fases previstas no MCR; outras fases → `ALERTA` | `IMPEDIDO` | Sim |
-| R-UC | Interseção com UC nas categorias previstas no MCR; outras categorias → `ALERTA` | `IMPEDIDO` | Sim |
-| R-QUI | Interseção com território quilombola titulado (fases TITULADO e TITULO_PARCIAL); demais fases → `ALERTA` | `IMPEDIDO` | Sim |
-| R-FPND | Interseção com Floresta Pública Tipo B (exceções do MCR exigem documento) | `IMPEDIDO` | Sim |
-| R-PRODES | Supressão de vegetação nativa após 31/07/2019 | `ALERTA` (nunca `IMPEDIDO`) | Não |
-| R-RFB | CNPJ com situação diferente de `ATIVA`; CPF → `NAO_VERIFICADO` (sem fonte) | `ALERTA` | Não |
+| ID | Fundamento (MCR 2-9, atualização 756) | Regra | Resultado | Obrigatória* |
+| :-- | :-- | :-- | :-- | :-- |
+| R-CAR | itens 2 e 3 | CAR não encontrado, `CANCELADO` ou `SUSPENSO` (`PENDENTE` não é vedado) | `IMPEDIDO` | Sim |
+| R-MTE | item 4 | Documento, ou raiz do CNPJ, no cadastro de empregadores do MTE | `IMPEDIDO` | Sim |
+| R-EMB-GEO | itens 10 a 13 | Embargo de área **registrado na lista do IBAMA** sobreposto ao imóvel, acima da tolerância. Detalhe indica se cabe a exceção documental do item 12 (até 30/06/2027). CAR coletivo (AST/PCT) → `ALERTA` (item 13) | `IMPEDIDO` | Sim |
+| R-EMB-EST | informativo | Embargo estadual sobreposto: só impede se também estiver na lista do IBAMA (item 10) | `ALERTA` | Não |
+| R-EMB-DOC | informativo (item 12, b) | Tomador (ou filial) autuado em embargo vigente em qualquer imóvel ou atividade | `ALERTA` | Não |
+| R-EMB-SEMGEO | informativo | Embargo sem polígono com ponto de referência dentro do imóvel | `ALERTA` | Não |
+| R-TI | item 7 | Terra indígena **homologada, regularizada, encaminhada ao registro ou Reserva Indígena**; demais fases → `ALERTA`. Exceção documental: proponente do povo ocupante | `IMPEDIDO` | Sim |
+| R-UC | itens 5 e 6 | UC registrada no **CNUC**. Exceção documental: atividade conforme o plano de manejo. UC de domínio exclusivamente público (ESEC, REBIO, Parque, Floresta, RESEX, REFAU, RDS) → `ALERTA` (impede só com regularização fundiária concluída) | `IMPEDIDO` | Sim |
+| R-QUI | itens 8 e 9 | Território quilombola titulado ou com título parcial; demais fases → `ALERTA` | `IMPEDIDO` | Sim |
+| R-FPND | itens 14 e 15 | Floresta Pública Tipo B (CNFP); exceções documentais do item 15 informadas no motivo | `IMPEDIDO` | Sim |
+| R-PRODES | itens 17 e 18 | Supressão após 31/07/2019; informa a data em que a verificação passa a ser exigida para o porte do imóvel (04/01/2027, 01/07/2027 ou 03/01/2028) | `ALERTA` | Não |
+| R-RFB | informativo | CNPJ com situação diferente de `ATIVA`; CPF → `NAO_VERIFICADO` (sem fonte) | `ALERTA` | Não |
 
-\* Obrigatória: `NAO_VERIFICADO` nesta regra torna o parecer `INCONCLUSIVO`. Valores atuais são rascunho técnico em `rules/mcr-2-9.yaml`, **pendentes de revisão jurídica**.
+\* Obrigatória: `NAO_VERIFICADO` nesta regra torna o parecer `INCONCLUSIVO`. Regras derivadas do **texto oficial da Seção 9 (atualização MCR nº 756, de 15/05/2026)**, com o item citado em cada resultado (`basis`). Leitura técnica, **sem parecer jurídico**. Exceções que dependem de documento do mutuário aparecem no motivo para a instituição financeira avaliar.
 
 Em todas as regras espaciais, cada polígono intersectado é classificado com a tolerância do tenant (seção 5.3) e prevalece o pior resultado; nos embargos, mede-se a área da união das interseções.
 

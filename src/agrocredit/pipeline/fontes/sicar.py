@@ -31,6 +31,8 @@ COLUNAS = (
     "municipio",
     "uf",
     "problema_geometria",
+    "tipo_imovel",
+    "modulos_fiscais",
 )
 
 
@@ -105,7 +107,10 @@ def _registro(props: dict[str, Any], geom: BaseGeometry | None) -> tuple[tuple[A
     geo = sanitizar(geom, float(area) if area else None)
     ewkb = bytes(shapely.to_wkb(shapely.set_srid(geo.geom, 4674), include_srid=True)) if geo.geom else None
     municipio = (int(props["cod_municipio_ibge"]), str(props["municipio"]), str(props["uf"]))
-    registro = (codigo, municipio[0], status, area, ewkb, municipio[1], municipio[2], geo.motivo)
+    tipo = str(props.get("tipo_imovel") or "").strip().upper() or None
+    mf_bruto = props.get("m_fiscal")
+    mf = None if mf_bruto is None or mf_bruto != mf_bruto else Decimal(str(mf_bruto))  # NaN != NaN
+    registro = (codigo, municipio[0], status, area, ewkb, municipio[1], municipio[2], geo.motivo, tipo, mf)
     return registro, f"geometria_descartada:{geo.motivo}" if geo.motivo else None
 
 

@@ -53,6 +53,7 @@ class CadastralOut(BaseModel):
 class CheckOut(BaseModel):
     rule_id: str
     result: RuleResult
+    basis: str | None = None  # dispositivo normativo que fundamenta a regra (ex.: "MCR 2-9 item 7")
     reason: str | None = None
     detail: dict[str, Any] | None = None
 

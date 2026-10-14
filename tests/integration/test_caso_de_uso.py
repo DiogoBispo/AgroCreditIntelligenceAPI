@@ -182,7 +182,9 @@ async def test_impedimentos_por_geometria_documento_e_ponto(api: asyncpg.Connect
     assert {e["process_number"] for e in geo.detail["embargoes"]} == {"PROC-T1", "PROC-T2"}  # T3 desembargado
     assert geo.detail["embargoes"][0]["embargo_date"] in {"2024-03-15", "2024-05-01"}
 
-    assert checks["R-EMB-DOC"].result is R.IMPEDIDO  # embargo na filial (mesma raiz de CNPJ)
+    # Embargo na filial (mesma raiz de CNPJ): informativo pelo MCR 2-9 item 10 (trata do imóvel)
+    assert checks["R-EMB-DOC"].result is R.ALERTA
+    assert checks["R-EMB-GEO"].basis == "MCR 2-9 itens 10 a 13"
     assert checks["R-EMB-SEMGEO"].result is R.ALERTA  # ponto do embargo T4 dentro do imóvel
     assert res.decision.credit_status is CreditStatus.IMPEDIMENTO_IDENTIFICADO
     assert res.input.document_masked == "11.222.333/****-**"
@@ -230,3 +232,17 @@ async def test_auditoria_pseudonimizada_e_isolada_por_tenant(api: asyncpg.Connec
     assert CPF.valor not in str(dict(propria))  # CPF nunca em claro na auditoria
     assert propria["dataset_versions"]  # versões das bases usadas no parecer
     assert await auditoria.consultar(api, res.analysis_id, "teste-coop-b") is None  # BOLA
+
+
+async def test_validacao_cruzada_concorda_com_o_repositorio(cenario: None) -> None:
+    from agrocredit.manutencao.validacao import validar
+
+    conn = await asyncpg.connect(ETL_DSN)
+    try:
+        await conn.execute("SET ROLE role_etl")
+        rel = await validar(conn)
+    finally:
+        await conn.close()
+    assert rel.imoveis == 1  # CAR_A (o outro não tem geometria)
+    assert rel.classificacao_divergente == [] and rel.area_divergente == []
+    assert rel.resultados["EMBARGO_FEDERAL:IMPEDIDO"] == 1

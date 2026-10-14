@@ -9,6 +9,7 @@ import json
 import re
 import unicodedata
 import urllib.parse
+import urllib.request
 import zipfile
 from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, date, datetime
@@ -21,7 +22,7 @@ import shapely
 from shapely.geometry import box
 
 from agrocredit.domain.enums import Camada
-from agrocredit.pipeline.bronze import Manifesto, baixar
+from agrocredit.pipeline.bronze import USER_AGENT, Manifesto, baixar
 from agrocredit.pipeline.geometria import sanitizar
 from agrocredit.pipeline.gold import Carga, Quarentena
 
@@ -38,6 +39,13 @@ URL_CNFP = (
 )
 AS_OF_CNFP = date(2026, 7, 23)  # "modified" do item no portal do SFB (CNFP 2025)
 URL_QUILOMBOLAS = "https://certificacao.incra.gov.br/csv_shp/zip/%C3%81reas%20de%20Quilombolas.zip"
+# Cópia da base da Funai sincronizada pelo IBAMA (PAMGIA, "BasesSincronizadas"): o WFS da própria Funai
+# recusa downloads (403). Traz as fases que o MCR 2-9 item 7 considera (homologada, regularizada, RI).
+URL_TI = (
+    "https://pamgia.ibama.gov.br/server/rest/services/BasesSincronizadas/"
+    "lim_terra_indigena_funai_a/MapServer/0/query"
+)
+PAGINA_ARCGIS = 1000
 WFS_PRODES = "https://terrabrasilis.dpi.inpe.br/geoserver/prodes-{bioma}-nb/ows"
 # Biomas dos municípios do MVP (workspaces confirmados na Fase 0); ampliar ao expandir o escopo
 BIOMAS_PRODES = ("cerrado", "mata-atlantica")
@@ -198,6 +206,65 @@ def baixar_prodes(diretorio: Path, versao: str, envelopes: Sequence[Envelope]) -
     return manifesto
 
 
+def _arcgis_json(params: dict[str, str]) -> dict[str, Any]:
+    req = urllib.request.Request(  # noqa: S310 (URL https fixa)
+        f"{URL_TI}?{urllib.parse.urlencode(params)}", headers={"User-Agent": USER_AGENT}
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310  # nosec B310
+        dados: dict[str, Any] = json.load(resp)
+    if "error" in dados:  # o ArcGIS responde erro com HTTP 200
+        raise RuntimeError(f"ArcGIS (PAMGIA) retornou erro: {dados['error']}")
+    return dados
+
+
+def baixar_ti(diretorio: Path, versao: str, envelopes: Sequence[Envelope]) -> Manifesto:
+    """ArcGIS REST por envelope, paginado. Saída em GeoJSON com geometria em SIRGAS 2000.
+
+    Um envelope sem TI é resultado legítimo; para não confundir com download quebrado, confere que a camada
+    inteira tem registros e guarda a data da última sincronização com a Funai (data de referência).
+    """
+    total = _arcgis_json({"where": "1=1", "returnCountOnly": "true", "f": "json"}).get("count", 0)
+    if not total:
+        raise RuntimeError("Camada de terras indígenas do PAMGIA vazia: download não confiável")
+    estat = _arcgis_json(
+        {
+            "where": "1=1",
+            "outStatistics": json.dumps(
+                [{"statisticType": "max", "onStatisticField": "dt_sync", "outStatisticFieldName": "s"}]
+            ),
+            "f": "json",
+        }
+    )
+    manifesto = Manifesto("FUNAI", versao)
+    manifesto.parametros["envelopes"] = [list(e) for e in envelopes]
+    manifesto.parametros["registros_na_camada"] = total
+    manifesto.parametros["dt_sync_ms"] = estat["features"][0]["attributes"]["s"]
+    for i, (x0, y0, x1, y1) in enumerate(envelopes):
+        for pagina in range(100):  # limite de segurança
+            params = {
+                "where": "1=1",
+                "geometry": f"{x0},{y0},{x1},{y1}",
+                "geometryType": "esriGeometryEnvelope",
+                "inSR": "4674",
+                "outSR": "4674",
+                "spatialRel": "esriSpatialRelIntersects",
+                "outFields": "*",
+                "orderByFields": "objectid",
+                "resultOffset": str(pagina * PAGINA_ARCGIS),
+                "resultRecordCount": str(PAGINA_ARCGIS),
+                "f": "geojson",
+            }
+            destino = diretorio / f"ti_{i}_{pagina:03d}.json"
+            manifesto.arquivos.append(baixar(f"{URL_TI}?{urllib.parse.urlencode(params)}", destino))
+            resposta = json.loads(destino.read_text())
+            if "error" in resposta or "features" not in resposta:
+                raise RuntimeError(f"Resposta inválida do PAMGIA: {str(resposta)[:200]}")
+            if len(resposta["features"]) < PAGINA_ARCGIS:
+                break
+    manifesto.salvar(diretorio)
+    return manifesto
+
+
 # Transformações ---------------------------------------------------------------------------
 
 
@@ -324,4 +391,27 @@ def transformar_prodes(diretorio: Path) -> Carga:
         },
         # Sem área de referência: area_km diverge >1% da área geodésica em 66% dos polígonos VÁLIDOS
         # (outra projeção), então não serve para a guarda de reparo
+    )
+
+
+def transformar_ti(diretorio: Path) -> Carga:
+    manifesto = Manifesto.carregar(diretorio)
+    gdf = _ler_geojsons(sorted(diretorio.glob("ti_*.json")))
+    # Data de referência: última sincronização da camada inteira com a Funai (vale mesmo sem TI no entorno)
+    as_of = datetime.fromtimestamp(int(manifesto.parametros["dt_sync_ms"]) / 1000, UTC).date()
+    return _carga(
+        "FUNAI",
+        manifesto,
+        as_of,
+        Camada.TI,
+        gdf,
+        chave=lambda p: str(p.get("terrai_cod") or p.get("gid")),
+        nome=lambda p: p.get("terrai_nom"),
+        atributos=lambda p: {
+            "fase": normalizar(p.get("fase_ti")),  # HOMOLOGADA, REGULARIZADA, ENCAMINHADA_RI...
+            "modalidade": normalizar(p.get("modalidade")),  # RESERVA_INDIGENA, TRADICIONALMENTE_OCUPADA...
+            "terrai_cod": p.get("terrai_cod"),
+            "etnia": p.get("etnia_nome"),
+            "data_atualizacao_funai": p.get("data_atual"),
+        },
     )

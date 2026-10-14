@@ -25,7 +25,7 @@ import asyncpg
 
 from agrocredit.core.config import ChavesHMAC
 from agrocredit.domain.validators import parse_document
-from agrocredit.manutencao import tarefas
+from agrocredit.manutencao import tarefas, validacao
 
 
 async def _com_papel[T](env: str, papel: str, tarefa: Callable[[asyncpg.Connection], Awaitable[T]]) -> T:
@@ -57,6 +57,8 @@ def main() -> None:
     p_ver.add_argument("--destino", type=Path, required=True)
     p_ver.add_argument("--manter", type=int, default=2)
     p_ver.add_argument("--fonte", action="append", help="restringe a estas fontes (repetível)")
+    p_val = sub.add_parser("validar-espacial", help="compara sobreposições da API com cálculo independente")
+    p_val.add_argument("--limite", type=int, help="máximo de imóveis (padrão: todos os cobertos)")
     p_tit = sub.add_parser("titular", help="análises sobre um documento (pedido do titular, LGPD art. 18)")
     p_tit.add_argument("--documento", required=True)
     args = p.parse_args()
@@ -80,6 +82,21 @@ def main() -> None:
             )
         )
         _imprimir([asdict(f) for f in feitas])
+    elif args.cmd == "validar-espacial":
+        rel = asyncio.run(
+            _com_papel("ETL_DATABASE_URL", "role_etl", lambda c: validacao.validar(c, args.limite))
+        )
+        _imprimir(
+            {
+                "imoveis": rel.imoveis,
+                "comparacoes": rel.comparacoes,
+                "classificacao_divergente": rel.classificacao_divergente,
+                "area_divergente_acima_de_0_01_ha": rel.area_divergente,
+                "maior_diferenca_ha": round(rel.maior_diferenca_ha, 6),
+                "resultados_independentes": dict(rel.resultados),
+            }
+        )
+        sys.exit(1 if rel.classificacao_divergente else 0)
     elif args.cmd == "limpar-versoes":
         arquivadas = asyncio.run(
             _com_papel(

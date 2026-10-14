@@ -22,6 +22,7 @@ class ConfigRegra:
     rule_id: str
     obrigatoria: bool
     params: Mapping[str, Any]
+    fundamento: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,9 +48,10 @@ def _parse_versao(raw: Mapping[str, Any]) -> VersaoRuleset:
             raise ValueError(f"Regra desconhecida no ruleset {raw['id']}: {rule_id}")
         cfg = dict(cfg or {})
         obrigatoria = cfg.pop("obrigatoria")
+        fundamento = cfg.pop("fundamento", None)
         if not isinstance(obrigatoria, bool):
             raise ValueError(f"{rule_id}: 'obrigatoria' deve ser booleano")
-        regras.append(ConfigRegra(rule_id, obrigatoria, cfg))
+        regras.append(ConfigRegra(rule_id, obrigatoria, cfg, fundamento))
     return VersaoRuleset(
         id=str(raw["id"]),
         vigencia_inicio=raw["vigencia_inicio"],

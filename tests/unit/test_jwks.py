@@ -101,4 +101,4 @@ def test_situacao_das_fontes() -> None:
             hoje,
         )
     }
-    assert s == {"IBAMA": "OK", "SICAR": "P2", "CNUC": "P1"}  # fonte sem limite (X) é ignorada
+    assert s == {"IBAMA": "OK", "SICAR": "P2", "CNUC": "P2"}  # fonte sem limite (X) é ignorada

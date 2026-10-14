@@ -24,7 +24,7 @@ import asyncpg
 
 from agrocredit.pipeline import gold
 from agrocredit.pipeline.bronze import Manifesto, nova_versao, registrar_manual
-from agrocredit.pipeline.fontes import embargos_mg, ibama, mte, sicar, territoriais
+from agrocredit.pipeline.fontes import embargos_mg, ibama, mte, rfb, sicar, territoriais
 
 MARGEM_GRAUS = 0.05  # ~5 km além do envelope dos imóveis cobertos
 
@@ -33,6 +33,7 @@ MARGEM_GRAUS = 0.05  # ~5 km além do envelope dos imóveis cobertos
 class Escopo:
     municipios: list[tuple[int, str]]
     envelopes: list[territoriais.Envelope] = field(default_factory=list)
+    tom_para_ibge: dict[int, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,9 @@ class Fonte:
     # informação nova, então a carga é pulada. Onde a data é a do download (SICAR, INCRA), recarregar
     # reconfirma a atualidade e não pode ser pulado.
     data_do_conteudo: bool = True
+    # Camada recortada pelo entorno do escopo: vazia é resultado legítimo (ex.: nenhuma TI perto dos imóveis).
+    # O download dessas fontes valida que a camada inteira não está vazia.
+    permite_vazia: bool = False
 
 
 def _territorial(url: str, arquivo: str, nome: str) -> Callable[[Path, str, Escopo], Manifesto]:
@@ -67,6 +71,9 @@ FONTES: dict[str, Fonte] = {
         "EMBARGOS_MG", "embargos", lambda d, v, _: embargos_mg.baixar_mg(d, v), embargos_mg.transformar_mg
     ),
     "mte": Fonte("MTE", "mte", lambda d, v, _: mte.baixar_mte(d, v), mte.transformar_mte),
+    "rfb": Fonte(
+        "RFB", "empresas", lambda d, v, e: rfb.baixar_rfb(d, v, e.tom_para_ibge), rfb.transformar_rfb
+    ),
     "cnuc": Fonte(
         "CNUC",
         "camadas_territoriais",
@@ -92,6 +99,14 @@ FONTES: dict[str, Fonte] = {
         aceita_arquivo=True,
         data_do_conteudo=False,
     ),
+    "ti": Fonte(
+        "FUNAI",
+        "camadas_territoriais",
+        lambda d, v, e: territoriais.baixar_ti(d, v, e.envelopes),
+        territoriais.transformar_ti,
+        precisa_envelopes=True,
+        permite_vazia=True,
+    ),
     "prodes": Fonte(
         "PRODES",
         "camadas_territoriais",
@@ -105,12 +120,9 @@ FONTES: dict[str, Fonte] = {
 async def escopo(dsn: str, com_envelopes: bool) -> Escopo:
     conn = await asyncpg.connect(dsn)
     try:
-        municipios = [
-            (r["codigo_ibge"], r["uf"])
-            for r in await conn.fetch(
-                "SELECT codigo_ibge, uf FROM core_geo.municipios WHERE em_cobertura ORDER BY codigo_ibge"
-            )
-        ]
+        todos = await conn.fetch("SELECT codigo_ibge, codigo_tom, uf, em_cobertura FROM core_geo.municipios")
+        municipios = sorted((r["codigo_ibge"], r["uf"]) for r in todos if r["em_cobertura"])
+        tom_para_ibge = {r["codigo_tom"]: r["codigo_ibge"] for r in todos}
         envelopes: list[territoriais.Envelope] = []
         if com_envelopes:
             rows = await conn.fetch(
@@ -126,7 +138,7 @@ async def escopo(dsn: str, com_envelopes: bool) -> Escopo:
                 sys.exit("Sem imóveis do SICAR publicados: rode `run sicar` antes das camadas territoriais.")
     finally:
         await conn.close()
-    return Escopo(municipios, envelopes)
+    return Escopo(municipios, envelopes, tom_para_ibge)
 
 
 async def _ja_carregada(dsn: str, carga: gold.Carga) -> bool:
@@ -194,8 +206,9 @@ async def run(
         carga = replace(carga, versao=nova_versao())
     print(f"[{nome}] {carga.resumo()}")
     await gold.carregar(dsn, carga)
+    shutil.rmtree(diretorio / "_trabalho", ignore_errors=True)  # intermediários grandes (RFB); o Bronze fica
     try:
-        await gold.publicar(dsn, carga.base, carga.fonte, carga.versao)
+        await gold.publicar(dsn, carga.base, carga.fonte, carga.versao, permitir_vazia=fonte.permite_vazia)
     except gold.PublicacaoBloqueada as exc:
         sys.exit(f"[{nome}] versão {carga.versao} carregada mas NÃO publicada: {exc}. Ver RUNBOOK INC-05.")
     print(f"[{nome}] versão {carga.versao} publicada (dados de {carga.source_as_of})")

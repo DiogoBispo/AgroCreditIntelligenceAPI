@@ -1,6 +1,7 @@
 """Motor de regras: avalia todas as regras do ruleset vigente e deriva o parecer."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 
 from agrocredit.domain.decision import derive_status
 from agrocredit.domain.enums import CreditStatus, RuleResult
@@ -21,9 +22,14 @@ class Parecer:
     tolerancia: Tolerancia
 
 
-def avaliar(fatos: Fatos, versao: VersaoRuleset, tolerancia: Tolerancia) -> Parecer:
+def avaliar(fatos: Fatos, versao: VersaoRuleset, tolerancia: Tolerancia, hoje: date | None = None) -> Parecer:
+    hoje = hoje or date.today()
     resultados = tuple(
-        REGISTRO[cfg.rule_id](fatos, ContextoRegra(tolerancia, cfg.params)) for cfg in versao.regras
+        replace(
+            REGISTRO[cfg.rule_id](fatos, ContextoRegra(tolerancia, cfg.params, hoje)),
+            fundamento=cfg.fundamento,
+        )
+        for cfg in versao.regras
     )
     status = derive_status({r.rule_id: r.result for r in resultados}, versao.obrigatorias, fatos.em_cobertura)
     return Parecer(versao.id, resultados, status, _resumo(status, resultados, versao), tolerancia)

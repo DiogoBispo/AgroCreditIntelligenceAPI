@@ -23,7 +23,7 @@ migrate:
 	MIGRATIONS_DATABASE_URL=$(OWNER_DSN) $(UV) run python -m agrocredit.infrastructure.db.migrate
 
 pipeline:  ## Carrega todas as fontes automatizáveis (SICAR primeiro: as camadas usam seus envelopes)
-	for f in sicar ibama embargos_mg mte cnuc cnfp quilombolas prodes; do ETL_DATABASE_URL=$(ETL_DSN) $(UV) run python -m agrocredit.pipeline run $$f || exit 1; done
+	for f in sicar ibama embargos_mg mte cnuc cnfp quilombolas prodes ti rfb; do ETL_DATABASE_URL=$(ETL_DSN) $(UV) run python -m agrocredit.pipeline run $$f || exit 1; done
 
 run:  ## Sobe a API local na porta 8000 (chaves de desenvolvimento em .secrets/)
 	@[ -f .secrets/jwks.json ] || $(UV) run python -m agrocredit.core.dev_keys gerar --dir .secrets

@@ -23,6 +23,13 @@ class Imovel:
     area_declarada_ha: Decimal | None
     area_geodesica_ha: Decimal | None
     problema_geometria: str | None = None  # geometria irrecuperável na fonte: sem interseções
+    tipo_imovel: str | None = None  # SICAR: IRU (individual), AST (assentamento), PCT (povos tradicionais)
+    modulos_fiscais: Decimal | None = None
+
+    @property
+    def uso_coletivo(self) -> bool:
+        """CAR do perímetro coletivo de assentamento ou povos tradicionais (MCR 2-9 itens 13 e 17-A)."""
+        return self.tipo_imovel in {"AST", "PCT"}
 
 
 @dataclass(frozen=True, slots=True)

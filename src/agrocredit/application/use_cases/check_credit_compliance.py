@@ -79,13 +79,14 @@ async def verificar(
         dados = await versoes_publicadas(conn)
         frescas = fontes_frescas(dados.data_as_of, hoje)
         fatos = await coletar_fatos(conn, documento, codigo_car, frescas)
-        parecer = engine.avaliar(fatos, versao, tenant.tolerancia)
+        parecer = engine.avaliar(fatos, versao, tenant.tolerancia, hoje)
 
         analysis_id = uuid4()
         checks = [
             CheckOut(
                 rule_id=r.rule_id,
                 result=r.result,
+                basis=r.fundamento,
                 reason=r.reason,
                 detail=dict(r.detail) if r.detail else None,
             )

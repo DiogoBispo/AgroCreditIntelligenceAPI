@@ -32,7 +32,7 @@ _CEM = Decimal(100)
 
 _SQL_IMOVEL = """
 SELECT codigo_car, codigo_ibge, uf, municipio, status_cadastro, area_declarada_ha, area_geodesica_ha,
-       problema_geometria
+       problema_geometria, tipo_imovel, modulos_fiscais
 FROM core_geo.imoveis_car_current WHERE codigo_car = $1
 """
 
@@ -156,6 +156,8 @@ async def _imovel(conn: Conexao, codigo_car: str) -> Imovel | None:
         area_declarada_ha=row["area_declarada_ha"],
         area_geodesica_ha=row["area_geodesica_ha"],
         problema_geometria=row["problema_geometria"],
+        tipo_imovel=row["tipo_imovel"],
+        modulos_fiscais=row["modulos_fiscais"],
     )
 
 

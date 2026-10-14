@@ -423,6 +423,8 @@ Implementado em `tests/unit/test_validators.py`, `tests/domain/test_rules.py` e 
 | Métricas | `presentation/api/metrics.py` | `GET /metrics` (Prometheus), token opcional; registro por app; rótulo de rota pelo modelo, não pelo caminho |
 | Pseudonimização | `core/config.py` (`ChavesHMAC`), `core/security.py` | Pepper versionado com versões anteriores, para rotação sem perder a busca do titular |
 | Manutenção | `manutencao/` | Partições e expurgo da auditoria, arquivamento de versões das bases, defasagem e busca do titular (RUNBOOK §4) |
+| Fundamento normativo | `rules/mcr-2-9.yaml`, `domain/rules/` | Regras derivadas do texto oficial do MCR 2-9 (atualização 756); cada resultado traz `basis` com o item; exceções documentais descritas no motivo |
+| Validação cruzada | `manutencao/validacao.py` | Sobreposições recalculadas com shapely + pyproj e comparadas com o repositório: 0 divergências em 41.089 comparações (17.228 imóveis) |
 | Imagens | `Dockerfile` | `api` (271 MB) e `tools` (pipeline + manutenção + migrations, com poppler); ambas não-root |
 | Rate limit | `presentation/api/dependencies.py` | Janela de 60 s por tenant, em memória; limite de `tenant_config` em cache por 60 s |
 | Erros | `presentation/api/app.py` | 422 sem o campo `input` (não ecoa o documento); timeout de query → 503 + `Retry-After`; 500 genérico com `request_id` |

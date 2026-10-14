@@ -14,8 +14,8 @@ LIMITE_CRITICO_DIAS: dict[str, int] = {
     Fonte.IBAMA: 10,
     Fonte.SICAR: 30,
     Fonte.RFB: 45,
-    Fonte.FUNAI: 60,
-    Fonte.CNUC: 240,  # publicação semestral (MMA) + margem
+    Fonte.FUNAI: 180,  # cópia sincronizada da Funai (PAMGIA/IBAMA); fase de TI muda raramente
+    Fonte.CNUC: 450,  # versão aberta mais recente do MMA tem atraso; as de 2026 exigem login
     Fonte.INCRA: 60,  # exportação gerada no momento do download
     Fonte.SFB: 395,  # CNFP anual + margem
     Fonte.PRODES: 395,  # publicação anual: 13 meses
@@ -47,9 +47,9 @@ LIMITE_ALERTA_DIAS: dict[str, int] = {
     Fonte.IBAMA: 7,
     Fonte.SICAR: 15,
     Fonte.RFB: 35,
-    Fonte.FUNAI: 35,
+    Fonte.FUNAI: 90,
     Fonte.INCRA: 35,
-    Fonte.CNUC: 200,
+    Fonte.CNUC: 240,
     Fonte.SFB: 365,
     Fonte.PRODES: 365,
 }

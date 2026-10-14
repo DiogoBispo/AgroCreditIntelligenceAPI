@@ -175,6 +175,22 @@ Tabela oficial `Municipios.zip` da RFB:
 
 Varredura de todos os 17.227 imóveis do escopo (documento fictício, sem regras documentais): 282 com impedimento (16 por embargo IBAMA, os demais por CAR cancelado/suspenso); 982 com alerta de PRODES pós-2019; 65 sobrepostos a quilombola em fase RTID; 5 embargos só de borda; 8 com ponto de embargo sem polígono dentro do imóvel.
 
+## 9c. Atualização (14/10/2026): só fontes públicas e permitidas
+
+Diretiva do projeto: sem parceiros, contatos institucionais ou credenciais; apenas dados públicos.
+
+| Pendência | Resolução |
+| :-- | :-- |
+| Terras indígenas | **Cópia da base da Funai sincronizada pelo IBAMA** (PAMGIA `BasesSincronizadas/lim_terra_indigena_funai_a`), sincronizada em 11/08/2026 (`dt_sync`). Traz só as fases finais (Regularizada, Homologada, Encaminhada RI), exatamente as que o MCR 2-9 item 7 considera. O WFS da Funai segue recusando downloads (403) mesmo no link divulgado pela própria Funai. As camadas de TI do TerraBrasilis (INPE) e a cópia antiga do PAMGIA são anteriores às homologações de abril/2023 e foram descartadas. Nenhuma TI no entorno dos 3 municípios |
+| Revisão jurídica | Substituída por **leitura técnica do texto oficial** da Seção 9 (atualização MCR nº 756, 15/05/2026); cada regra cita o item. Ver PRD §5.2 |
+| Embargo de atividade (decisão 2) | Resolvido pelo texto: o item 10 trata de embargo de área por desmatamento ilegal no imóvel, registrado na lista do IBAMA. Embargo por documento e embargo de atividade são informativos |
+| CNUC 2026 (login) | Mantida a versão aberta de ago/2025; limite de defasagem ajustado a 450 dias (alerta P2 a partir de 240) com essa justificativa. O MCR 2-9 item 5 exige justamente o registro no CNUC |
+| Defasagem da TI | Limite de 180 dias (P2 a partir de 90): a fase de uma TI muda raramente e a cópia sincronizada não tem cadência publicada |
+| Casos rotulados | Substituídos por **validação cruzada técnica** (`manutencao validar-espacial`): 41.089 comparações em 17.228 imóveis, sem nenhuma divergência de classificação; maior diferença de área 0,00005 ha. Não valida a interpretação normativa |
+| RFB | Carga completa de todos os estabelecimentos (decisão do projeto) |
+
+Efeito na varredura dos 17.228 imóveis: 15.575 sem impedimento nas bases consultadas, 1.064 com alertas, 589 com impedimento (266 por CAR cancelado/suspenso, 16 por embargo do IBAMA e 307 por UC, dos quais 302 na APA da Escarpa Devoniana em Castro, sujeitos à exceção do plano de manejo) e nenhum inconclusivo.
+
 ## 10. Decisões necessárias
 
 | # | Decisão | Quem | Recomendação |

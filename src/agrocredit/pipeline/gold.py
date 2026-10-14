@@ -11,6 +11,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import asyncpg
@@ -41,13 +42,24 @@ class Carga:
     registros: Sequence[tuple[Any, ...]]  # colunas de geometria como EWKB (SRID 4674)
     quarentena: Quarentena
     manifesto: Manifesto | None = None
+    # Cargas grandes (RFB): registros num CSV com cabeçalho, copiado direto para o banco
+    arquivo_csv: Path | None = None
+    total_csv: int | None = None
 
     def __post_init__(self) -> None:
         validar_identificadores(self.base, self.fonte, self.versao)
 
+    @property
+    def total(self) -> int:
+        return (
+            self.total_csv
+            if self.arquivo_csv is not None and self.total_csv is not None
+            else len(self.registros)
+        )
+
     def resumo(self) -> str:
         motivos = Counter(motivo.split(":")[0] for _, motivo, _ in self.quarentena)
-        return f"{self.fonte} {self.versao}: {len(self.registros)} registros; quarentena {dict(motivos)}"
+        return f"{self.fonte} {self.versao}: {self.total} registros; quarentena {dict(motivos)}"
 
     @property
     def tabela(self) -> str:
@@ -81,15 +93,18 @@ async def carregar(dsn: str, carga: Carga) -> int:
     conn = await _conectar(dsn)
     try:
         async with conn.transaction():
-            await conn.execute(
-                f"CREATE TABLE {carga.tabela} (LIKE core_geo.{carga.base}_template INCLUDING ALL)"
-            )
-            await conn.copy_records_to_table(
-                carga.tabela.split(".")[1],
-                schema_name="core_geo",
-                columns=list(carga.colunas),
-                records=carga.registros,
-            )
+            if carga.arquivo_csv is None:
+                await conn.execute(
+                    f"CREATE TABLE {carga.tabela} (LIKE core_geo.{carga.base}_template INCLUDING ALL)"
+                )
+                await conn.copy_records_to_table(
+                    carga.tabela.split(".")[1],
+                    schema_name="core_geo",
+                    columns=list(carga.colunas),
+                    records=carga.registros,
+                )
+            else:
+                await _copiar_csv(conn, carga)
             await conn.execute(f"ANALYZE {carga.tabela}")
             if carga.manifesto:
                 await conn.executemany(
@@ -132,20 +147,57 @@ async def carregar(dsn: str, carga: Carga) -> int:
                 carga.versao,
                 carga.base,
                 carga.source_as_of,
-                len(carga.registros),
+                carga.total,
                 len(carga.quarentena),
             )
-        return len(carga.registros)
+        return carga.total
     finally:
         await conn.close()
 
 
-async def _checar_sanidade(conn: asyncpg.Connection, base: str, fonte: str, versao: str) -> list[str]:
+_INDICE = re.compile(r"^CREATE (UNIQUE )?INDEX \S+ ON \S+ (USING .+)$")
+
+
+async def _copiar_csv(conn: asyncpg.Connection, carga: Carga) -> None:
+    """COPY de um CSV grande numa tabela sem índices; PK e índices do template são criados depois."""
+    template = f"core_geo.{carga.base}_template"
+    await conn.execute(f"CREATE TABLE {carga.tabela} (LIKE {template} INCLUDING ALL EXCLUDING INDEXES)")
+    if carga.arquivo_csv is None:
+        raise ValueError("Carga sem arquivo CSV")
+    await conn.copy_to_table(
+        carga.tabela.split(".")[1],
+        schema_name="core_geo",
+        source=carga.arquivo_csv,
+        columns=list(carga.colunas),
+        format="csv",
+        header=True,
+    )
+    pk = await conn.fetchval(
+        "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = $1::regclass AND contype = 'p'",
+        template,
+    )
+    if pk:
+        await conn.execute(f"ALTER TABLE {carga.tabela} ADD {pk}")
+    indices = await conn.fetch(
+        "SELECT pg_get_indexdef(i.indexrelid) AS def FROM pg_index i"
+        " WHERE i.indrelid = $1::regclass AND NOT i.indisprimary",
+        template,
+    )
+    for row in indices:
+        m = _INDICE.match(row["def"])
+        if not m:
+            raise RuntimeError(f"Definição de índice inesperada: {row['def']}")
+        await conn.execute(f"CREATE {m[1] or ''}INDEX ON {carga.tabela} {m[2]}")
+
+
+async def _checar_sanidade(
+    conn: asyncpg.Connection, base: str, fonte: str, versao: str, permitir_vazia: bool = False
+) -> list[str]:
     tabela = tabela_versao(base, fonte, versao)
     problemas: list[str] = []
     # Nomes de tabela não são parametrizáveis; os identificadores foram validados (validar_identificadores)
     n = await conn.fetchval(f"SELECT count(*) FROM {tabela}")  # nosec B608
-    if n == 0:
+    if n == 0 and not permitir_vazia:
         problemas.append("versão vazia")
     anterior = await conn.fetchrow(
         "SELECT versao, registros FROM core_geo.dataset_versions"
@@ -198,6 +250,7 @@ async def publicar(
     *,
     aprovado_por: str | None = None,
     motivo: str | None = None,
+    permitir_vazia: bool = False,
 ) -> None:
     """Publica uma versão carregada. Checagem que falha bloqueia, salvo aprovação explícita com motivo."""
     validar_identificadores(base, fonte, versao)
@@ -205,7 +258,7 @@ async def publicar(
         raise ValueError("Aprovação manual exige aprovado_por e motivo")
     conn = await _conectar(dsn)
     try:
-        problemas = await _checar_sanidade(conn, base, fonte, versao)
+        problemas = await _checar_sanidade(conn, base, fonte, versao, permitir_vazia)
         if problemas and aprovado_por is None:
             await conn.execute(
                 "UPDATE core_geo.dataset_versions SET bloqueio = $3 WHERE fonte = $1 AND versao = $2",

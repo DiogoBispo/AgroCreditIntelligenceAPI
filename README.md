@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/DiogoBispo/AgroCreditIntelligenceAPI/actions/workflows/ci.yml/badge.svg)](https://github.com/DiogoBispo/AgroCreditIntelligenceAPI/actions/workflows/ci.yml)
 
-API que cruza bases públicas brasileiras (SICAR, IBAMA, MTE, MMA, SFB, INCRA, INPE) e devolve, para um par
+API que cruza bases públicas brasileiras (SICAR, IBAMA, MTE, Funai, MMA, SFB, INCRA, INPE, RFB) e devolve, para um par
 **documento do tomador + código CAR do imóvel**, um relatório de impedimentos socioambientais do crédito rural
 previstos na Seção 9 do Capítulo 2 do Manual de Crédito Rural (MCR 2-9).
 
@@ -10,8 +10,9 @@ previstos na Seção 9 do Capítulo 2 do Manual de Crédito Rural (MCR 2-9).
 é da instituição financeira.
 
 > **Estado: MVP técnico.** Escopo de três municípios — Rio Verde (GO), Patrocínio (MG) e Castro (PR). As regras
-> em [`rules/mcr-2-9.yaml`](rules/mcr-2-9.yaml) são um rascunho técnico **pendente de revisão jurídica** e
-> ainda não há validação contra casos reais rotulados. Não use para decisões de crédito.
+> em [`rules/mcr-2-9.yaml`](rules/mcr-2-9.yaml) seguem o **texto oficial da Seção 9 do MCR (atualização nº 756,
+> 15/05/2026)**, com o item citado em cada resultado, mas são uma leitura técnica **sem parecer jurídico** e
+> sem validação contra casos reais rotulados. Use como apoio à análise, não como decisão de crédito.
 
 ## Como funciona
 
@@ -21,6 +22,9 @@ previstos na Seção 9 do Capítulo 2 do Manual de Crédito Rural (MCR 2-9).
                       quarentena, proveniência       versão publicada de cada fonte   resultado por regra
 ```
 
+- **Cada regra cita o dispositivo do MCR que a fundamenta** (`basis`) e, no motivo, a exceção documental
+  cabível (plano de manejo, pertencimento a povo indígena ou quilombola, matrícula, documentos do item 18 etc.),
+  que a instituição financeira avalia.
 - **Todas as regras são avaliadas** (não para no primeiro impedimento). Cada uma devolve `IMPEDIDO`, `ALERTA`,
   `OK` ou `NAO_VERIFICADO`, e o parecer final é um de: `IMPEDIMENTO_IDENTIFICADO`, `INCONCLUSIVO`,
   `SEM_IMPEDIMENTO_COM_ALERTAS`, `SEM_IMPEDIMENTO_NAS_BASES_CONSULTADAS` ou `FORA_DE_COBERTURA`.
@@ -36,19 +40,24 @@ previstos na Seção 9 do Capítulo 2 do Manual de Crédito Rural (MCR 2-9).
 | Base | Fonte | Situação |
 | :-- | :-- | :-- |
 | Imóveis rurais | SICAR (WFS oficial) | ✅ |
-| Embargos federais | IBAMA (CSV diário) | ✅ |
-| Embargos estaduais | MG (IDE-Sisema) | ✅ camada sem atualização desde mai/2026 |
+| Embargos | IBAMA (CSV diário, lista exigida pelo MCR 2-9 item 10) | ✅ |
+| Embargos estaduais (informativo) | MG (IDE-Sisema) | ✅ camada sem atualização desde mai/2026 |
 | Cadastro de empregadores (trabalho análogo à escravidão) | MTE (PDF) | ✅ |
-| Unidades de conservação | CNUC/MMA | ✅ versão ago/2025; a de 2026 exige download manual |
+| Terras indígenas | Funai, cópia sincronizada pelo IBAMA (PAMGIA) | ✅ o WFS da própria Funai recusa downloads |
+| Unidades de conservação | CNUC/MMA | ✅ versão aberta de ago/2025; a de 2026 exige login |
 | Florestas públicas | CNFP/SFB | ✅ |
 | Territórios quilombolas | INCRA | ✅ |
 | Desmatamento | PRODES/INPE (Cerrado, Mata Atlântica) | ✅ |
-| Terras indígenas | FUNAI | ❌ sem canal atual acessível |
-| CNPJ (situação cadastral) | RFB | ❌ aguardando decisão de recorte |
+| CNPJ (situação cadastral, todos os estabelecimentos) | RFB (WebDAV público) | ✅ carregador pronto; primeira carga completa em andamento |
 | Embargos ICMBio | PAMGIA | ❌ fonte sem atualização desde 2022 |
 | Embargos estaduais de GO e PR | — | ❌ sem base aberta |
 
 Canais, campos, volumes e problemas de qualidade de cada fonte: [FASE0_FONTES.md](documents/FASE0_FONTES.md).
+
+Resultado atual nos 17.228 imóveis do escopo (documento de teste, sem regras por documento): 15.575 sem
+impedimento nas bases consultadas, 1.064 com alertas e 589 com impedimento — 266 por CAR cancelado ou suspenso,
+16 por embargo do IBAMA e 307 por unidade de conservação (302 na APA da Escarpa Devoniana, em Castro, sujeitos
+à exceção do plano de manejo).
 
 ## Começando
 
@@ -80,12 +89,12 @@ Resposta (resumida):
 {
   "decision": { "credit_status": "IMPEDIMENTO_IDENTIFICADO", "summary": "Impedimento identificado: [R-EMB-GEO] ..." },
   "checks": [
-    { "rule_id": "R-EMB-GEO", "result": "IMPEDIDO",
+    { "rule_id": "R-EMB-GEO", "result": "IMPEDIDO", "basis": "MCR 2-9 itens 10 a 13",
       "detail": { "overlap_ha": "70.4316", "overlap_pct": "26.5681", "embargoes": [ { "source": "IBAMA", "process_number": "..." } ] } },
-    { "rule_id": "R-TI", "result": "NAO_VERIFICADO", "reason": "Base FUNAI indisponível ou desatualizada." }
+    { "rule_id": "R-TI", "result": "OK", "basis": "MCR 2-9 item 7" }
   ],
   "owner_link_verified": false,
-  "data_as_of": { "sicar": "2026-10-14", "ibama": "2026-10-13", "mte": "2026-10-06" }
+  "data_as_of": { "sicar": "2026-10-14", "ibama": "2026-10-13", "mte": "2026-10-06", "funai": "2026-08-11" }
 }
 ```
 
@@ -114,7 +123,9 @@ Variáveis de ambiente: [`.env.example`](.env.example).
   após checagens de sanidade (variação de volume acima de ±20% bloqueia até aprovação manual). Arquivo obtido
   fora do pipeline entra com proveniência: `run cnuc --arquivo X.zip --as-of 2026-07-01`.
 - **Manutenção**: `python -m agrocredit.manutencao` — defasagem das bases (código de saída para alerta),
-  partições e expurgo da auditoria, arquivamento de versões antigas em Parquet e pedido do titular (LGPD art. 18).
+  partições e expurgo da auditoria, arquivamento de versões antigas em Parquet, pedido do titular (LGPD art. 18)
+  e **validação cruzada** das sobreposições (`validar-espacial`: recalcula com shapely + pyproj, sem o PostGIS,
+  e compara com a API; última execução: 0 divergências em 41.089 comparações).
 - **Agendamento**: [`ops/agrocredit.crontab`](ops/agrocredit.crontab), executado por
   [`ops/agendar.sh`](ops/agendar.sh) (sem sobreposição, syslog, alerta opcional).
 - **Métricas e alertas sugeridos**, playbooks de incidente e rotação de chaves: [RUNBOOK.md](documents/RUNBOOK.md).
@@ -159,18 +170,16 @@ tests/             unit, domain, pipeline, integration (inclui regressões de se
 
 ## O que falta
 
-Depende de decisão ou de terceiros (detalhes em [FASE0_FONTES.md §10](documents/FASE0_FONTES.md)):
+O projeto usa **apenas dados públicos**, sem parceiros nem credenciais. Dentro dessa restrição:
 
-- **Fonte atual de terras indígenas.** Enquanto faltar, nenhum parecer sai "sem impedimento" (R-TI é obrigatória).
-- **CNUC 2026**: download manual (o link do MMA exige login) e carga com `--arquivo`.
-- **Recorte da carga da RFB** (CNAE 01 ou todos os CNPJs).
-- **Revisão jurídica** de `rules/mcr-2-9.yaml`, inclusive embargo de atividade e fases de quilombolas.
-- **Casos reais rotulados** por analistas de crédito para a validação (PRD §5.5).
-- **Canal atual** dos embargos do ICMBio e bases estaduais de GO e PR.
-
-Engenharia:
-
-- Pipeline da RFB (após a decisão de recorte).
-- Teste de regressão das regras contra os casos rotulados no CI.
-- Rate limit compartilhado (Redis), necessário só com mais de uma instância da API.
-- Verificação do vínculo tomador × imóvel (fase 3, ver AI_EVALS).
+- **Parecer jurídico** sobre a leitura do MCR 2-9. Destaque: pela letra do item 5, imóvel em APA impede o
+  crédito salvo atividade conforme o plano de manejo; o sistema marca `IMPEDIDO` com a exceção no motivo
+  (302 imóveis em Castro). Tratar APA como `ALERTA` é uma linha em `rules/mcr-2-9.yaml`.
+- **Casos reais rotulados** para medir as metas de concordância do PRD §5.5. A validação cruzada confirma o
+  cálculo espacial, não a interpretação da norma.
+- **CNUC 2026**: só existe em link do MMA que exige login; quem o obtiver carrega com
+  `run cnuc --arquivo X.zip --as-of 2026-07-01`.
+- **Embargos do ICMBio e estaduais de GO e PR**: sem fonte pública atual (não são exigidos pelo MCR 2-9, que
+  usa a lista do IBAMA).
+- **Vínculo tomador × imóvel** (fase 3, leitura de matrícula; ver AI_EVALS).
+- **Rate limit compartilhado** (Redis), necessário só com mais de uma instância da API.

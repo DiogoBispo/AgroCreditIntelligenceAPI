@@ -60,9 +60,19 @@ def test_ruleset_cobre_todas_as_regras_registradas(versao: VersaoRuleset) -> Non
     assert {r.rule_id for r in versao.regras} == set(REGISTRO)
 
 
-def test_ruleset_marcado_como_pendente_de_revisao(versao: VersaoRuleset) -> None:
-    # Remover este teste só quando o jurídico aprovar o ruleset
-    assert versao.revisao_juridica == "PENDENTE"
+def test_ruleset_sem_revisao_juridica_e_com_fundamento(versao: VersaoRuleset) -> None:
+    # Regras derivadas do texto oficial do MCR 2-9; mudar só se houver parecer jurídico
+    assert versao.revisao_juridica == "NAO_REALIZADA"
+    assert all(r.fundamento for r in versao.regras)
+
+
+def test_parecer_traz_o_fundamento_de_cada_regra(
+    fatos: FatosF, versao: VersaoRuleset, tol: Tolerancia
+) -> None:
+    p = engine.avaliar(fatos(), versao, tol)
+    fundamentos = {r.rule_id: r.fundamento for r in p.resultados}
+    assert fundamentos["R-TI"] == "MCR 2-9 item 7"
+    assert fundamentos["R-MTE"] == "MCR 2-9 item 4"
 
 
 def test_regras_que_nao_podem_ser_obrigatorias(versao: VersaoRuleset) -> None:

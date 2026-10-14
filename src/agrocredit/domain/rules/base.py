@@ -1,5 +1,6 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -21,12 +22,14 @@ class ResultadoRegra:
     result: RuleResult
     reason: str | None = None
     detail: Mapping[str, Any] | None = None
+    fundamento: str | None = None  # dispositivo normativo (ex.: "MCR 2-9 item 7"), preenchido pelo motor
 
 
 @dataclass(frozen=True, slots=True)
 class ContextoRegra:
     tolerancia: Tolerancia
     params: Mapping[str, Any] = field(default_factory=dict)
+    hoje: date = field(default_factory=date.today)  # prazos do MCR (itens 12 e 17)
 
 
 Regra = Callable[[Fatos, ContextoRegra], ResultadoRegra]

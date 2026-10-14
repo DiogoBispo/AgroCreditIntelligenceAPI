@@ -196,6 +196,7 @@ Cada comando assume o papel de banco com o mínimo necessário (`role_etl` ou `r
 | `particoes --meses 3` | Garante as partições mensais da auditoria | Mensal |
 | `expurgar-auditoria --destino DIR` | Exporta para Parquet (com `.sha256`), relê e confere, só então remove partições com mais de 5 anos | Mensal |
 | `limpar-versoes --manter 2 --destino DIR [--fonte X]` | Arquiva em Parquet (geometria em EWKB) e remove versões antigas das bases; nunca a publicada | Semanal |
+| `validar-espacial [--limite N]` | Recalcula as sobreposições de todos os imóveis cobertos sem o PostGIS (shapely + pyproj) e compara com a API; saída 1 se alguma classificação divergir | Após cargas de SICAR, IBAMA ou camadas |
 | `titular --documento X` | Pedido do titular (LGPD art. 18): análises do documento em todos os tenants e versões da chave HMAC | Sob demanda (DPO) |
 
 O agendamento completo (bases e manutenção) está em `ops/agrocredit.crontab`, executado por `ops/agendar.sh`:

@@ -15,10 +15,15 @@ AGROCREDIT=/opt/agrocredit
 0 2 * * 0    $AGROCREDIT/ops/agendar.sh sicar        agrocredit.pipeline run sicar
 0 4 * * 0    $AGROCREDIT/ops/agendar.sh embargos_mg  agrocredit.pipeline run embargos_mg
 30 4 * * 0   $AGROCREDIT/ops/agendar.sh quilombolas  agrocredit.pipeline run quilombolas
+45 4 * * 0   $AGROCREDIT/ops/agendar.sh ti           agrocredit.pipeline run ti
+# Validação cruzada das sobreposições depois das cargas de domingo
+0 6 * * 0    $AGROCREDIT/ops/agendar.sh validacao    agrocredit.manutencao validar-espacial
 # Fontes de publicação semestral/anual: mensal basta
 0 3 1 * *    $AGROCREDIT/ops/agendar.sh cnuc         agrocredit.pipeline run cnuc
 30 3 1 * *   $AGROCREDIT/ops/agendar.sh cnfp         agrocredit.pipeline run cnfp
 0 4 1 * *    $AGROCREDIT/ops/agendar.sh prodes       agrocredit.pipeline run prodes
+# RFB publica mensalmente (~dia 13): checagem no dia 15; edição já carregada é pulada (mesmo SHA-256)
+0 1 15 * *   $AGROCREDIT/ops/agendar.sh rfb          agrocredit.pipeline run rfb
 
 # Manutenção (RUNBOOK §4) ---------------------------------------------------------------------
 # Defasagem das bases: saída 1 (P2) ou 2 (P1) dispara o alerta
