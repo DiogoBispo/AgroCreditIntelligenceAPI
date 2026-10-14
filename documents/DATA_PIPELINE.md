@@ -11,6 +11,7 @@
 > **Terras indígenas e RFB (14/10/2026)**:
 > - **TI**: `pipeline/fontes/territoriais.py` (`run ti`), cópia da Funai sincronizada pelo IBAMA (PAMGIA), ArcGIS REST por envelope. Data de referência = `dt_sync` da camada inteira. O download falha se o ArcGIS responder erro ou se a camada inteira vier vazia; um envelope sem TI é publicado vazio (`permite_vazia`), porque é resultado legítimo.
 > - **RFB**: `pipeline/fontes/rfb.py` (`run rfb`), todos os estabelecimentos via WebDAV público da RFB, só 4 colunas (CNPJ, situação, CNAE, município), todas as situações. Transformação em DuckDB a partir de streaming latin-1 → UTF-8; carga por `COPY` de CSV com PK e índices criados depois da cópia.
+> - Primeira carga completa (edição 2026-10): 73.809.379 estabelecimentos (28,4 mi ativos, 34,8 mi baixados, 10,2 mi inaptos), sem quarentena, em 31 min; tabela de 9,2 GB; consulta por CNPJ em 0,06 ms pela PK. Já há 1 CNPJ alfanumérico na base. Memória do DuckDB limitada a 4 GB, com transbordo para disco (sem limite, o pico foi ~10 GB).
 > - Validação cruzada após cada carga: `python -m agrocredit.manutencao validar-espacial`.
 >
 > **Camadas territoriais e embargos de MG (14/10/2026)** — `pipeline/fontes/territoriais.py` e `embargos_mg.py`. Canais e achados em `FASE0_FONTES.md` §9b. Destaques:

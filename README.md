@@ -48,7 +48,7 @@ previstos na Seção 9 do Capítulo 2 do Manual de Crédito Rural (MCR 2-9).
 | Florestas públicas | CNFP/SFB | ✅ |
 | Territórios quilombolas | INCRA | ✅ |
 | Desmatamento | PRODES/INPE (Cerrado, Mata Atlântica) | ✅ |
-| CNPJ (situação cadastral, todos os estabelecimentos) | RFB (WebDAV público) | ✅ carregador pronto; primeira carga completa em andamento |
+| CNPJ (situação cadastral, todos os estabelecimentos) | RFB (WebDAV público) | ✅ 73,8 mi de estabelecimentos (edição out/2026), todas as situações |
 | Embargos ICMBio | PAMGIA | ❌ fonte sem atualização desde 2022 |
 | Embargos estaduais de GO e PR | — | ❌ sem base aberta |
 

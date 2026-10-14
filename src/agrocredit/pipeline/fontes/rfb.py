@@ -132,6 +132,10 @@ def transformar_rfb(diretorio: Path) -> Carga:
     saida = trabalho / "estabelecimentos.csv"
     con = duckdb.connect(str(trabalho / "rfb.duckdb"))
     try:
+        # Sem limite, a deduplicação de ~74 mi de linhas chegou a ~10 GB de memória; com limite, o DuckDB
+        # transborda para disco na pasta de trabalho
+        con.execute("SET memory_limit = '4GB'")
+        con.execute("SET temp_directory = ?", [str(trabalho / "duckdb_tmp")])
         con.execute("CREATE OR REPLACE TABLE tom_ibge (tom VARCHAR, ibge INTEGER)")
         con.executemany(
             "INSERT INTO tom_ibge VALUES (?, ?)", [(f"{k:04d}", v) for k, v in tom_para_ibge.items()]
